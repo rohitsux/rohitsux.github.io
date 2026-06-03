@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>rohit.snake — INSERT COIN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#020402; --dim:#1f7a26; --mid:#1f9a28; --grn:#41f048; --hi:#aeffb0; --amber:#ffce5c;
+    --vt:'VT323',monospace; --p2p:'Press Start 2P',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    background:#000;display:flex;align-items:center;justify-content:center;
+    min-height:100vh;font-family:var(--vt);color:var(--grn);padding:18px;
+    background-image:radial-gradient(circle at 50% 40%,#0a160b 0%,#000 70%);
+  }
+  /* arcade cabinet */
+  .cab{
+    width:100%;max-width:520px;
+    background:linear-gradient(#0d130d,#070a07);
+    border:2px solid #16361a;border-radius:14px;
+    padding:18px 18px 14px;
+    box-shadow:0 30px 80px -20px rgba(0,0,0,.9),inset 0 0 0 1px rgba(65,240,72,.06);
+  }
+  .marq{
+    font-family:var(--p2p);font-size:13px;color:var(--grn);text-align:center;
+    text-shadow:0 0 10px rgba(65,240,72,.6);letter-spacing:1px;margin-bottom:4px;
+  }
+  .marq small{font-family:var(--vt);font-size:17px;color:var(--mid);display:block;letter-spacing:2px;text-shadow:none;margin-top:3px;}
+
+  .screen{
+    position:relative;margin:14px 0 12px;border-radius:10px;overflow:hidden;
+    background:var(--bg);border:2px solid #16361a;
+    box-shadow:inset 0 0 60px rgba(0,0,0,.9),inset 0 0 14px rgba(65,240,72,.12);
+  }
+  canvas{display:block;width:100%;height:auto;image-rendering:pixelated;}
+  .screen::after{ /* scanlines + vignette */
+    content:"";position:absolute;inset:0;pointer-events:none;z-index:5;
+    background:
+      radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.55) 100%),
+      repeating-linear-gradient(to bottom,transparent 0,transparent 2px,rgba(0,0,0,.22) 3px,rgba(0,0,0,.22) 4px);
+    animation:flick 6s infinite;
+  }
+  @keyframes flick{0%,96%,100%{opacity:1}97%{opacity:.85}98%{opacity:1}99%{opacity:.92}}
+
+  .hud{
+    position:absolute;top:0;left:0;right:0;z-index:6;display:flex;justify-content:space-between;
+    padding:8px 12px;font-family:var(--vt);font-size:20px;color:var(--hi);
+    text-shadow:0 0 8px rgba(174,255,176,.5);pointer-events:none;
+  }
+  .hud .lbl{color:var(--mid);}
+
+  .overlay{
+    position:absolute;inset:0;z-index:7;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;gap:10px;
+    background:rgba(2,4,2,.74);backdrop-filter:blur(1px);
+  }
+  .overlay.hide{display:none;}
+  .overlay pre{
+    font-family:var(--vt);white-space:pre;line-height:1;font-size:16px;color:var(--grn);
+    text-shadow:0 0 10px rgba(65,240,72,.6);
+  }
+  .overlay .big{font-family:var(--p2p);font-size:20px;color:var(--hi);text-shadow:0 0 14px rgba(174,255,176,.6);}
+  .overlay .blink{font-family:var(--p2p);font-size:11px;color:var(--amber);animation:bl 1s steps(1) infinite;text-shadow:0 0 10px rgba(255,206,92,.5);}
+  .overlay .sub{font-size:19px;color:var(--mid);line-height:1.3;}
+  .overlay .score-big{font-family:var(--p2p);font-size:15px;color:var(--grn);}
+  @keyframes bl{50%{opacity:0}}
+
+  /* d-pad / controls */
+  .controls{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:6px;}
+  .pad{display:grid;grid-template-columns:repeat(3,46px);grid-template-rows:repeat(3,46px);gap:5px;}
+  .pad button{
+    font-family:var(--vt);font-size:24px;color:var(--grn);background:#0c160d;
+    border:2px solid #16361a;border-radius:8px;cursor:pointer;line-height:1;
+    box-shadow:inset 0 0 8px rgba(65,240,72,.08);transition:.06s;
+  }
+  .pad button:active{background:#16361a;color:var(--hi);transform:translateY(1px);}
+  .pad .up{grid-area:1/2} .pad .left{grid-area:2/1} .pad .dn{grid-area:3/2} .pad .right{grid-area:2/3}
+  .pad .mid{grid-area:2/2;border-color:transparent;box-shadow:none;background:transparent;}
+  .meta{flex:1;font-family:var(--vt);font-size:16px;color:var(--mid);line-height:1.45;text-align:right;}
+  .meta b{color:var(--grn);}
+  .meta .keys{display:inline-block;border:1px solid #16361a;padding:1px 6px;border-radius:4px;color:var(--hi);margin:2px 1px;font-size:14px;}
+
+  @media (max-width:430px){ .marq{font-size:11px} .pad{grid-template-columns:repeat(3,42px);grid-template-rows:repeat(3,42px)} }
+
+  /* embed mode: drop the cabinet chrome so it nests inside a CRT */
+  body.embed{background:transparent;padding:0;min-height:auto;display:block;overflow:hidden;}
+  body.embed .cab{background:transparent;border:0;box-shadow:none;padding:0;max-width:none;width:100%;}
+  body.embed .marq{display:none;}
+  body.embed .controls{display:none;}
+  body.embed .screen{margin:0;}
+</style>
+</head>
+<body>
+  <div class="cab">
+    <div class="marq">rohit.snake<small>// eat the commits · don't bite the buffer</small></div>
+
+    <div class="screen">
+      <canvas id="g" width="440" height="440"></canvas>
+      <div class="hud">
+        <span><span class="lbl">SCORE</span> <span id="score">0</span></span>
+        <span><span class="lbl">HI</span> <span id="hi">0</span></span>
+      </div>
+
+      <div class="overlay" id="ovTitle">
+<pre>  ▄▄▄ ▄   ▄ ▄▄▄ ▄  ▄ ▄▄▄
+ █    ██  █ █▄▄█ █▄▀  █▄▄
+ ▀▄▄▄ █ ▀▄█ █  █ █ ▀▄ █▄▄</pre>
+        <div class="sub">guide the snake · eat green commits<br>each commit = +1 &amp; a little faster</div>
+        <div class="blink">▶ PRESS SPACE / TAP TO INSERT COIN</div>
+      </div>
+
+      <div class="overlay hide" id="ovOver">
+        <div class="big">GAME OVER</div>
+        <div class="score-big">SCORE <span id="finalScore">0</span> · HI <span id="finalHi">0</span></div>
+        <div class="sub" id="quip">buffer overflow.</div>
+        <div class="blink">▶ PRESS SPACE / TAP TO RETRY</div>
+      </div>
+
+      <div class="overlay hide" id="ovPause">
+        <div class="big">PAUSED</div>
+        <div class="blink">▶ PRESS P / TAP TO RESUME</div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="pad">
+        <button class="up"   data-dir="up"   aria-label="up">▲</button>
+        <button class="left" data-dir="left" aria-label="left">◀</button>
+        <button class="mid"></button>
+        <button class="right" data-dir="right" aria-label="right">▶</button>
+        <button class="dn"   data-dir="down" aria-label="down">▼</button>
+      </div>
+      <div class="meta">
+        move <span class="keys">↑↓←→</span> <span class="keys">WASD</span><br>
+        pause <span class="keys">P</span> · start <span class="keys">SPACE</span><br>
+        <b id="status">INSERT COIN</b>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  if(new URLSearchParams(location.search).get('embed')) document.body.classList.add('embed');
+})();
+(function(){
+  const cv=document.getElementById('g'), ctx=cv.getContext('2d');
+  const COLS=22, ROWS=22, CELL=cv.width/COLS;
+  const scoreEl=document.getElementById('score'), hiEl=document.getElementById('hi');
+  const ovTitle=document.getElementById('ovTitle'), ovOver=document.getElementById('ovOver'), ovPause=document.getElementById('ovPause');
+  const statusEl=document.getElementById('status');
+  const HI_KEY='rohit.snake.hi';
+
+  let snake, dir, nextDir, food, score, hi, speed, acc, last, state, foodPulse=0;
+  hi=parseInt(localStorage.getItem(HI_KEY)||'0',10); hiEl.textContent=hi;
+
+  const QUIPS=['buffer overflow.','stack smashed.','segfault. core dumped.','merge conflict with a wall.','null pointer to tail.','ran out of context window.'];
+
+  function reset(){
+    snake=[{x:8,y:11},{x:7,y:11},{x:6,y:11}];
+    dir={x:1,y:0}; nextDir={x:1,y:0};
+    score=0; speed=7.5; acc=0; last=performance.now();
+    placeFood(); scoreEl.textContent=0;
+  }
+  function placeFood(){
+    while(true){
+      const f={x:(Math.random()*COLS)|0,y:(Math.random()*ROWS)|0};
+      if(!snake.some(s=>s.x===f.x&&s.y===f.y)){food=f;return;}
+    }
+  }
+  function setState(s){
+    state=s;
+    ovTitle.classList.toggle('hide',s!=='title');
+    ovOver.classList.toggle('hide',s!=='over');
+    ovPause.classList.toggle('hide',s!=='pause');
+    statusEl.textContent = s==='play'?'RUNNING…': s==='pause'?'PAUSED': s==='over'?'GAME OVER':'INSERT COIN';
+  }
+  function start(){ reset(); setState('play'); last=performance.now(); }
+
+  function step(){
+    dir=nextDir;
+    const head={x:snake[0].x+dir.x, y:snake[0].y+dir.y};
+    // wall = death
+    if(head.x<0||head.y<0||head.x>=COLS||head.y>=ROWS){ return die(); }
+    // self = death
+    if(snake.some(s=>s.x===head.x&&s.y===head.y)){ return die(); }
+    snake.unshift(head);
+    if(head.x===food.x&&head.y===food.y){
+      score++; scoreEl.textContent=score;
+      speed=Math.min(18,7.5+score*0.45);
+      placeFood();
+    } else { snake.pop(); }
+  }
+  function die(){
+    setState('over');
+    document.getElementById('finalScore').textContent=score;
+    if(score>hi){ hi=score; localStorage.setItem(HI_KEY,hi); hiEl.textContent=hi; }
+    document.getElementById('finalHi').textContent=hi;
+    document.getElementById('quip').textContent=QUIPS[(Math.random()*QUIPS.length)|0];
+  }
+
+  function draw(){
+    // bg + faint grid dots
+    ctx.fillStyle='#020402'; ctx.fillRect(0,0,cv.width,cv.height);
+    ctx.fillStyle='rgba(31,122,38,.18)';
+    for(let x=0;x<COLS;x++)for(let y=0;y<ROWS;y++){ ctx.fillRect(x*CELL+CELL/2-1,y*CELL+CELL/2-1,2,2); }
+    // food = commit square (pulsing)
+    foodPulse=(foodPulse+0.12)%(Math.PI*2);
+    const pin=2+Math.sin(foodPulse)*1.2;
+    ctx.shadowColor='#41f048'; ctx.shadowBlur=12;
+    ctx.fillStyle='#41f048';
+    ctx.fillRect(food.x*CELL+pin, food.y*CELL+pin, CELL-pin*2, CELL-pin*2);
+    ctx.shadowBlur=0;
+    // snake
+    snake.forEach((s,i)=>{
+      const head=i===0;
+      ctx.fillStyle=head?'#aeffb0':'#2fbf3a';
+      if(head){ctx.shadowColor='#aeffb0';ctx.shadowBlur=10;} else {ctx.shadowBlur=0;}
+      ctx.fillRect(s.x*CELL+1.5, s.y*CELL+1.5, CELL-3, CELL-3);
+    });
+    ctx.shadowBlur=0;
+  }
+
+  function loop(now){
+    requestAnimationFrame(loop);
+    if(state==='play'){
+      const dt=(now-last)/1000; last=now; acc+=dt;
+      const stepTime=1/speed;
+      while(acc>=stepTime){ step(); acc-=stepTime; if(state!=='play')break; }
+    } else { last=now; }
+    draw();
+  }
+
+  function turn(nx,ny){
+    if(state!=='play') return;
+    if(dir.x===-nx&&dir.y===-ny) return; // no 180
+    nextDir={x:nx,y:ny};
+  }
+  const DIRS={up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]};
+
+  function action(){ // space/tap on screen
+    if(state==='title'||state==='over') start();
+    else if(state==='pause') setState('play');
+  }
+
+  // keyboard
+  addEventListener('keydown',e=>{
+    const k=e.key.toLowerCase();
+    if(k==='arrowup'||k==='w'){turn(0,-1);e.preventDefault();}
+    else if(k==='arrowdown'||k==='s'){turn(0,1);e.preventDefault();}
+    else if(k==='arrowleft'||k==='a'){turn(-1,0);e.preventDefault();}
+    else if(k==='arrowright'||k==='d'){turn(1,0);e.preventDefault();}
+    else if(k===' '||k==='enter'){action();e.preventDefault();}
+    else if(k==='p'){ if(state==='play')setState('pause'); else if(state==='pause')setState('play'); }
+  });
+  // dpad
+  document.querySelectorAll('.pad button[data-dir]').forEach(b=>{
+    b.addEventListener('click',()=>{ if(state!=='play'){action();} const d=DIRS[b.dataset.dir]; turn(d[0],d[1]); });
+  });
+  // tap/swipe on screen
+  const scr=document.querySelector('.screen');
+  scr.addEventListener('click',()=>{ if(state!=='play') action(); });
+  let tsx=0,tsy=0;
+  scr.addEventListener('touchstart',e=>{const t=e.touches[0];tsx=t.clientX;tsy=t.clientY;},{passive:true});
+  scr.addEventListener('touchend',e=>{
+    const t=e.changedTouches[0],dx=t.clientX-tsx,dy=t.clientY-tsy;
+    if(Math.abs(dx)<18&&Math.abs(dy)<18){ if(state!=='play')action(); return; }
+    if(Math.abs(dx)>Math.abs(dy)) turn(dx>0?1:-1,0); else turn(0,dy>0?1:-1);
+  },{passive:true});
+
+  reset(); setState('title'); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
